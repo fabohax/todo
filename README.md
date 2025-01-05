@@ -1,36 +1,100 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Minimal TODO App
 
-## Getting Started
+A simple and minimalistic TODO application built with **Next.js** and **TypeScript**. The app allows users to add tasks, mark them as completed, undo completed tasks, and delete tasks. Completed tasks are shown in a separate list. All tasks are persisted in a local `tasks.json` file.
 
-First, run the development server:
+## Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- **Add Tasks**: Input tasks and add them to the list.
+- **Mark as Completed**: Move tasks to a "Completed" list.
+- **Undo Completed**: Move tasks back to the pending list.
+- **Delete Tasks**: Remove tasks from either list.
+- **Persistent Storage**: Tasks are saved locally in `tasks.json`.
+- **Exportable Static App**: Package the app as a standalone static site for local use.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Technologies Used
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- [Next.js](https://nextjs.org/) (React Framework)
+- TypeScript (for type safety)
+- Tailwind CSS (for styling)
+- Node.js (`fs` module for file handling)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Installation
 
-## Learn More
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/fabohax/todo.git
+   cd todo
+   ```
 
-To learn more about Next.js, take a look at the following resources:
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+3. Run the development server:
+   ```bash
+   npm run dev
+   ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+4. Open your browser and navigate to:
+   ```
+   http://localhost:3000
+   ```
 
-## Deploy on Vercel
+## Export as a Static App
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+You can export this app as a fully static application that can run locally without a server.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Steps to Export
+
+1. Build and Export the App:
+   Run the following commands to build the app and export it as static files:
+
+   ```bash
+   npm run build
+   npx next export
+   ```
+
+   This will generate an `out` directory in the root of your project, containing all the static files.
+
+2. Open the Exported App:
+   - Navigate to the `out` directory:
+     ```bash
+     cd out
+     ```
+   - Open the `index.html` file in your browser to use the app locally.
+
+## How It Works
+
+1. **Add Tasks**:
+   - Enter a task in the input field and press the `+` button or hit `Enter`.
+   - The task appears in the "Pending Tasks" list.
+
+2. **Mark as Completed**:
+   - Click the "Complete" button next to a task.
+   - The task moves to the "Completed Tasks" list.
+
+3. **Undo Completed Tasks**:
+   - Click the "Undo" button next to a completed task.
+   - The task moves back to the "Pending Tasks" list.
+
+4. **Delete Tasks**:
+   - Click the "Delete" button next to a task to remove it permanently.
+
+5. **Persistent Storage**:
+   - Tasks are saved in a `tasks.json` file.
+   - The app reads this file when it starts to reload tasks.
+
+6. **Static Export**:
+   - The app can be exported as static files for offline or local use.
+
+---
+
+## Future Improvements
+
+- Add due dates and priority levels for tasks.
+- Implement search and filtering functionality.
+
+## License
+
+This project is open-source.
