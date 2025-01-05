@@ -52,7 +52,6 @@ You can export this app as a fully static application that can run locally witho
 
    ```bash
    npm run build
-   npx next export
    ```
 
    This will generate an `out` directory in the root of your project, containing all the static files.
