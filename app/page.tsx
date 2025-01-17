@@ -1,4 +1,3 @@
-// /app/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -13,25 +12,28 @@ export default function Home() {
   const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
   const [newTask, setNewTask] = useState<string>("");
 
-  // Fetch tasks and completed tasks when the app loads
+  // Load tasks from Local Storage on component mount
   useEffect(() => {
-    const fetchTasks = async () => {
-      const response = await fetch("/api/save-tasks");
-      const data = await response.json();
-      setTasks(data.pending || []);
-      setCompletedTasks(data.completed || []);
-    };
-    fetchTasks();
+    const savedTasks = localStorage.getItem("todo-tasks");
+    const savedCompletedTasks = localStorage.getItem("todo-completed-tasks");
+
+    if (savedTasks) setTasks(JSON.parse(savedTasks));
+    if (savedCompletedTasks) setCompletedTasks(JSON.parse(savedCompletedTasks));
   }, []);
+
+  // Save tasks to Local Storage whenever they change
+  useEffect(() => {
+    localStorage.setItem("todo-tasks", JSON.stringify(tasks));
+    localStorage.setItem("todo-completed-tasks", JSON.stringify(completedTasks));
+  }, [tasks, completedTasks]);
 
   const addTask = () => {
     if (newTask.trim()) {
       const updatedTasks = [...tasks, { text: newTask, completed: false }];
       setTasks(updatedTasks);
-      saveTasks(updatedTasks, completedTasks);
       setNewTask("");
     }
-  };  
+  };
 
   const toggleCompletion = (index: number, isCompleted: boolean) => {
     if (isCompleted) {
@@ -40,14 +42,12 @@ export default function Home() {
       const updatedTasks = [...tasks, { ...task, completed: false }];
       setCompletedTasks(updatedCompletedTasks);
       setTasks(updatedTasks);
-      saveTasks(updatedTasks, updatedCompletedTasks);
     } else {
       const task = tasks[index];
       const updatedTasks = tasks.filter((_, i) => i !== index);
       const updatedCompletedTasks = [...completedTasks, { ...task, completed: true }];
       setTasks(updatedTasks);
       setCompletedTasks(updatedCompletedTasks);
-      saveTasks(updatedTasks, updatedCompletedTasks);
     }
   };
 
@@ -55,85 +55,81 @@ export default function Home() {
     if (isCompleted) {
       const updatedCompletedTasks = completedTasks.filter((_, i) => i !== index);
       setCompletedTasks(updatedCompletedTasks);
-      saveTasks(tasks, updatedCompletedTasks);
     } else {
       const updatedTasks = tasks.filter((_, i) => i !== index);
       setTasks(updatedTasks);
-      saveTasks(updatedTasks, completedTasks);
     }
   };
 
-  const saveTasks = async (tasks: Task[], completedTasks: Task[]) => {
-    const data = { pending: tasks, completed: completedTasks };
-    await fetch("/api/save-tasks", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(data),
-    });
-  };
-
   return (
-    <div style={{ padding: "20px", fontFamily: "Arial, sans-serif" }} className="lg:w-1/2 lg:mx-auto my-20 text-[2rem]">
-      
-      <div className="flex items-center space-x-2">
+    <div className="p-6 lg:w-1/2 lg:mx-auto my-20 text-[1.5rem]">
+      <h1 className="text-center text-3xl font-bold mb-8 hidden">TODO</h1>
+
+      {/* Add Task Section */}
+      <div className="flex items-center space-x-2 mb-8">
         <input
-            type="text"
-            value={newTask}
-            onChange={(e) => setNewTask(e.target.value)}
-            onKeyDown={(e) => {
+          type="text"
+          value={newTask}
+          onChange={(e) => setNewTask(e.target.value)}
+          onKeyDown={(e) => {
             if (e.key === "Enter") {
-                addTask();
+              addTask();
             }
-            }}
-            placeholder="░"
-            className="p-4 border border-gray-300 rounded-lg w-full bg-transparent"
+          }}
+          placeholder="░"
+          className="p-4 border border-gray-300 rounded-lg w-full bg-transparent"
         />
         <button
-            onClick={addTask}
-            className="p-4 border border-gray-300 rounded-lg w-full bg-transparent hover:bg-[#151515]"
+          onClick={addTask}
+          className="px-11 p-4 border border-gray-300 rounded-lg bg-transparent hover:bg-gray-800 hover:text-white transition"
         >
-            +
+          +
         </button>
-    </div>
+      </div>
 
-      <ul className="my-8 mx-4">
+      {/* Pending Tasks */}
+      <ul className="mb-8 space-y-4">
         {tasks.map((task, index) => (
-          <li
-            key={index}
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: "10px",
-            }}
-          >
-            - {task.text}
+          <li key={index} className="flex justify-between items-center">
+            <span>- {task.text}</span>
             <div className="flex space-x-2">
-              <button onClick={() => toggleCompletion(index, false)} className="p-4 border border-gray-300 rounded-lg w-full bg-transparent">√</button>
-              <button onClick={() => deleteTask(index, false)} className="p-4 border border-gray-300 rounded-lg w-full bg-transparent">×</button>
+              <button
+                onClick={() => toggleCompletion(index, false)}
+                className="px-4 p-2 border border-gray-300 rounded hover:bg-green-500 hover:text-white transition select-none"
+              >
+                √
+              </button>
+              <button
+                onClick={() => deleteTask(index, false)}
+                className="px-4 p-2 border border-gray-300 rounded hover:bg-red-500 hover:text-white transition select-none"
+              >
+                ×
+              </button>
             </div>
           </li>
         ))}
       </ul>
 
       <hr/>
-      <ul className="my-8 mx-4 text-[#333]">
+
+      {/* Completed Tasks */}
+      <ul className="space-y-4 my-8">
         {completedTasks.map((task, index) => (
-          <li
-            key={index}
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: "10px",
-            }}
-          >
-            <span style={{textDecoration: "line-through"}}>- {task.text}</span>
+          <li key={index} className="flex justify-between items-center text-gray-500">
+            <span className="line-through">- {task.text}</span>
             <div className="flex space-x-2">
-              <button onClick={() => toggleCompletion(index, true)} className="p-4 border border-[#333] rounded-lg w-full bg-transparent">-</button>
-              <button onClick={() => deleteTask(index, true)} className="p-4 border border-[#333] rounded-lg w-full bg-transparent">×</button>
+              <button
+                onClick={() => toggleCompletion(index, true)}
+                className="px-3 p-2 border border-gray-300 rounded hover:bg-yellow-500 hover:text-white transition select-none"
+              >
+                ↩
+              </button>
+              <button
+                onClick={() => deleteTask(index, true)}
+                className="px-4 p-2 border border-gray-300 rounded hover:bg-red-500 hover:text-white transition select-none"
+              >
+                ×
+              </button>
             </div>
           </li>
         ))}
