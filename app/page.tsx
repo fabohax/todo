@@ -81,7 +81,7 @@ export default function Home() {
         />
         <button
           onClick={addTask}
-          className="px-11 p-4 border border-gray-300 rounded-lg bg-transparent hover:bg-gray-800 hover:text-white transition"
+          className="px-11 p-4 border border-gray-300 rounded-lg bg-transparent hover:bg-[#fff] hover:text-black transition"
         >
           +
         </button>
