@@ -150,19 +150,19 @@ export default function Home() {
             onDragStart={() => handleDragStart(index)}
             onDragOver={(e) => e.preventDefault()}
             onDrop={() => handleDrop(index, true)}
-            className="flex justify-between items-center text-gray-500 border p-2 rounded-lg bg-gray-50 shadow-sm hover:bg-gray-100"
+            className="flex justify-between items-center text-gray-500 p-2"
           >
             <span className="line-through">- {task.text}</span>
             <div className="flex space-x-2">
               <button
                 onClick={() => toggleCompletion(index, true)}
-                className="px-3 p-2 border border-gray-300 rounded hover:bg-yellow-500 hover:text-white transition select-none"
+                className="px-3 p-2 border border-[#222] rounded hover:bg-yellow-500 hover:text-white transition select-none"
               >
                 ↩
               </button>
               <button
                 onClick={() => deleteTask(index, true)}
-                className="px-4 p-2 border border-gray-300 rounded hover:bg-red-500 hover:text-white transition select-none"
+                className="px-4 p-2 border border-[#222] rounded hover:bg-red-500 hover:text-white transition select-none"
               >
                 ×
               </button>
