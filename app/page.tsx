@@ -120,7 +120,7 @@ export default function Home() {
             onDrop={() => handleDrop(index, false)}
             className="flex justify-between items-center pl-4 rounded-lg shadow-sm cursor-grab"
           >
-            <span className="cursor-text">- {task.text}</span>
+            <span>- {task.text}</span>
             <div className="flex space-x-2">
               <button
                 onClick={() => toggleCompletion(index, false)}
