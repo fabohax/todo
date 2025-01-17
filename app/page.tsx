@@ -12,6 +12,8 @@ export default function Home() {
   const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
   const [newTask, setNewTask] = useState<string>("");
 
+  const [draggedTaskIndex, setDraggedTaskIndex] = useState<number | null>(null);
+
   // Load tasks from Local Storage on component mount
   useEffect(() => {
     const savedTasks = localStorage.getItem("todo-tasks");
@@ -61,10 +63,30 @@ export default function Home() {
     }
   };
 
+  const handleDragStart = (index: number) => {
+    setDraggedTaskIndex(index);
+  };
+
+  const handleDrop = (targetIndex: number, isCompleted: boolean) => {
+    if (draggedTaskIndex === null) return;
+
+    if (isCompleted) {
+      const reorderedTasks = [...completedTasks];
+      const [movedTask] = reorderedTasks.splice(draggedTaskIndex, 1);
+      reorderedTasks.splice(targetIndex, 0, movedTask);
+      setCompletedTasks(reorderedTasks);
+    } else {
+      const reorderedTasks = [...tasks];
+      const [movedTask] = reorderedTasks.splice(draggedTaskIndex, 1);
+      reorderedTasks.splice(targetIndex, 0, movedTask);
+      setTasks(reorderedTasks);
+    }
+
+    setDraggedTaskIndex(null);
+  };
+
   return (
     <div className="p-6 lg:w-1/2 lg:mx-auto my-20 text-[1.5rem]">
-      <h1 className="text-center text-3xl font-bold mb-8 hidden">TODO</h1>
-
       {/* Add Task Section */}
       <div className="flex items-center space-x-2 mb-8">
         <input
@@ -90,8 +112,15 @@ export default function Home() {
       {/* Pending Tasks */}
       <ul className="mb-8 space-y-4">
         {tasks.map((task, index) => (
-          <li key={index} className="flex justify-between items-center">
-            <span>- {task.text}</span>
+          <li
+            key={index}
+            draggable
+            onDragStart={() => handleDragStart(index)}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={() => handleDrop(index, false)}
+            className="flex justify-between items-center pl-4 rounded-lg shadow-sm cursor-grab"
+          >
+            <span className="cursor-text">- {task.text}</span>
             <div className="flex space-x-2">
               <button
                 onClick={() => toggleCompletion(index, false)}
@@ -110,12 +139,19 @@ export default function Home() {
         ))}
       </ul>
 
-      <hr/>
+      <hr />
 
       {/* Completed Tasks */}
       <ul className="space-y-4 my-8">
         {completedTasks.map((task, index) => (
-          <li key={index} className="flex justify-between items-center text-gray-500">
+          <li
+            key={index}
+            draggable
+            onDragStart={() => handleDragStart(index)}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={() => handleDrop(index, true)}
+            className="flex justify-between items-center text-gray-500 border p-2 rounded-lg bg-gray-50 shadow-sm hover:bg-gray-100"
+          >
             <span className="line-through">- {task.text}</span>
             <div className="flex space-x-2">
               <button
