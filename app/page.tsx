@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 
 type Task = {
   text: string;
@@ -170,6 +171,9 @@ export default function Home() {
           </li>
         ))}
       </ul>
+      <div> 
+        <Link href="https://github.com/fabohax/todo" target="_blank" className="absolute bottom-2 right-2 mx-auto hover:underline text-[.75em] text-[#333]">🄯 OS</Link>
+      </div>
     </div>
   );
 }
