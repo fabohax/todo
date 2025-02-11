@@ -6,6 +6,8 @@ import Link from "next/link";
 type Task = {
   text: string;
   completed: boolean;
+  createdAt: string;
+  completedAt?: string;
 };
 
 export default function Home() {
@@ -30,37 +32,69 @@ export default function Home() {
     localStorage.setItem("todo-completed-tasks", JSON.stringify(completedTasks));
   }, [tasks, completedTasks]);
 
+  // Format timestamp for display
+  const formatDate = (timestamp: string) => {
+    if (!timestamp) return "N/A";
+    const date = new Date(timestamp);
+    return date.toLocaleString(); // Formats as a readable date
+  };
+
+  // ✅ Ensure createdAt is stored when adding tasks
   const addTask = () => {
     if (newTask.trim()) {
-      const updatedTasks = [...tasks, { text: newTask, completed: false }];
+      const newTaskObject: Task = {
+        text: newTask,
+        completed: false,
+        createdAt: new Date().toISOString(), // Store timestamp
+      };
+
+      const updatedTasks = [newTaskObject, ...tasks];
       setTasks(updatedTasks);
-      setNewTask("");
+      localStorage.setItem("todo-tasks", JSON.stringify(updatedTasks)); // Save to LocalStorage
+
+      setNewTask(""); // Clear input field
     }
   };
 
+  // ✅ Store completedAt timestamp when completing tasks
   const toggleCompletion = (index: number, isCompleted: boolean) => {
     if (isCompleted) {
       const task = completedTasks[index];
       const updatedCompletedTasks = completedTasks.filter((_, i) => i !== index);
-      const updatedTasks = [...tasks, { ...task, completed: false }];
+      const updatedTasks = [
+        ...tasks,
+        { ...task, completed: false, completedAt: undefined }, // Remove completed timestamp
+      ];
       setCompletedTasks(updatedCompletedTasks);
       setTasks(updatedTasks);
+
+      localStorage.setItem("todo-tasks", JSON.stringify(updatedTasks));
+      localStorage.setItem("todo-completed-tasks", JSON.stringify(updatedCompletedTasks));
     } else {
       const task = tasks[index];
       const updatedTasks = tasks.filter((_, i) => i !== index);
-      const updatedCompletedTasks = [...completedTasks, { ...task, completed: true }];
+      const updatedCompletedTasks = [
+        ...completedTasks,
+        { ...task, completed: true, completedAt: new Date().toISOString() }, // Store completion timestamp
+      ];
       setTasks(updatedTasks);
       setCompletedTasks(updatedCompletedTasks);
+
+      localStorage.setItem("todo-tasks", JSON.stringify(updatedTasks));
+      localStorage.setItem("todo-completed-tasks", JSON.stringify(updatedCompletedTasks));
     }
   };
 
+  // Delete task
   const deleteTask = (index: number, isCompleted: boolean) => {
     if (isCompleted) {
       const updatedCompletedTasks = completedTasks.filter((_, i) => i !== index);
       setCompletedTasks(updatedCompletedTasks);
+      localStorage.setItem("todo-completed-tasks", JSON.stringify(updatedCompletedTasks));
     } else {
       const updatedTasks = tasks.filter((_, i) => i !== index);
       setTasks(updatedTasks);
+      localStorage.setItem("todo-tasks", JSON.stringify(updatedTasks));
     }
   };
 
@@ -119,9 +153,14 @@ export default function Home() {
             onDragStart={() => handleDragStart(index)}
             onDragOver={(e) => e.preventDefault()}
             onDrop={() => handleDrop(index, false)}
-            className="flex justify-between items-center pl-4 rounded-lg shadow-sm cursor-grab"
+            className="flex bg-[#111] justify-between items-center pl-4 rounded-lg shadow-sm cursor-grab p-4"
           >
-            <span>- {task.text}</span>
+            <div>
+              <span>• {task.text}</span>
+              <div className="text-xs text-gray-600">
+                ■ {task.createdAt ? formatDate(task.createdAt) : "N/A"}
+              </div>
+            </div>
             <div className="flex space-x-2">
               <button
                 onClick={() => toggleCompletion(index, false)}
@@ -151,9 +190,19 @@ export default function Home() {
             onDragStart={() => handleDragStart(index)}
             onDragOver={(e) => e.preventDefault()}
             onDrop={() => handleDrop(index, true)}
-            className="flex justify-between items-center text-gray-500 p-2"
+            className="flex justify-between items-center text-gray-500 p-4"
           >
-            <span className="line-through">- {task.text}</span>
+            <div>
+              <span className="line-through">- {task.text}</span>
+              <div className="text-xs text-gray-600">
+                ■ {task.createdAt ? formatDate(task.createdAt) : "N/A"}
+              </div>
+              {task.completedAt && (
+                <div className="text-xs text-gray-600">
+                  ■ {formatDate(task.completedAt)}
+                </div>
+              )}
+            </div>
             <div className="flex space-x-2">
               <button
                 onClick={() => toggleCompletion(index, true)}
