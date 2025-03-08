@@ -3,19 +3,26 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #111;
+  --foreground-rgb: 255, 255, 255; /* Default: Dark text for light mode */
+  --background-start-rgb: 0, 0, 0; /* Light background */
+  --background-end-rgb: 0, 0, 0; /* Slightly darker for gradient */
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #111;
-    --foreground: #ededed;
+    --foreground-rgb: 255, 255, 255; /* Light text for dark mode */
+    --background-start-rgb: 0, 0, 0; /* Dark background */
+    --background-end-rgb: 20, 20, 20; /* Slightly lighter for gradient */
   }
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Inter', sans-serif;
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+    to bottom,
+    rgb(var(--background-start-rgb)),
+    rgb(var(--background-end-rgb))
+  );
+  overflow-x: hidden;
 }
