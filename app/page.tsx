@@ -16,12 +16,6 @@ type ContributionDay = {
   level: number;
 };
 
-type ContributionTooltip = {
-  count: number;
-  x: number;
-  y: number;
-};
-
 const DAY_LABELS = ["", "Mon", "", "Wed", "", "Fri", ""];
 const MONTH_LABELS = [
   "Jan",
@@ -66,8 +60,6 @@ export default function Home() {
   const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
   const [newTask, setNewTask] = useState<string>("");
   const [draggedTaskIndex, setDraggedTaskIndex] = useState<number | null>(null);
-  const [contributionTooltip, setContributionTooltip] =
-    useState<ContributionTooltip | null>(null);
 
   const contributionWeeks = useMemo(() => {
     const completionsByDate = completedTasks.reduce<Record<string, number>>(
@@ -213,16 +205,6 @@ export default function Home() {
     setDraggedTaskIndex(null);
   };
 
-  const showContributionTooltip = (element: HTMLElement, count: number) => {
-    const rect = element.getBoundingClientRect();
-
-    setContributionTooltip({
-      count,
-      x: rect.left + rect.width / 2,
-      y: rect.top,
-    });
-  };
-
   const downloadBackup = () => {
     const backupData = {
       "todo-tasks": tasks,
@@ -298,14 +280,6 @@ export default function Home() {
                     title={`${day.count} task${day.count === 1 ? "" : "s"} completed on ${day.date.toLocaleDateString()}`}
                     aria-label={`${day.count} task${day.count === 1 ? "" : "s"} completed on ${day.date.toLocaleDateString()}`}
                     tabIndex={0}
-                    onMouseEnter={(event) =>
-                      showContributionTooltip(event.currentTarget, day.count)
-                    }
-                    onFocus={(event) =>
-                      showContributionTooltip(event.currentTarget, day.count)
-                    }
-                    onMouseLeave={() => setContributionTooltip(null)}
-                    onBlur={() => setContributionTooltip(null)}
                     className={`h-[13px] w-[13px] rounded-[3px] outline-none ring-offset-2 ring-offset-[#080808] focus-visible:ring-1 focus-visible:ring-[#8b949e] ${INTENSITY_CLASSES[day.level]}`}
                   />
                 ))
@@ -314,19 +288,8 @@ export default function Home() {
           </div>
         </div>
       </div>
-	      {contributionTooltip && (
-	        <div
-	          className="pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded bg-[#000] px-2 py-1 text-[11px] leading-none text-[#fff] shadow-lg"
-	          style={{
-	            left: contributionTooltip.x,
-	            top: contributionTooltip.y - 6,
-	          }}
-	        >
-	          {contributionTooltip.count} completed
-	        </div>
-	      )}
 
-	      {/* Add Task Section */}
+      {/* Add Task Section */}
       <div className="flex items-center gap-1 sm:gap-2 mb-4 sm:mb-6 md:mb-8">
         <input
           type="text"
