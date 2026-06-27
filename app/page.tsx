@@ -16,20 +16,20 @@ type ContributionDay = {
   level: number;
 };
 
-const DAY_LABELS = ["", "Mon", "", "Wed", "", "Fri", ""];
+const DAY_LABELS = ["", "Lun", "", "Mie", "", "Vie", ""];
 const MONTH_LABELS = [
-  "Jan",
+  "Ene",
   "Feb",
   "Mar",
-  "Apr",
+  "Abr",
   "May",
   "Jun",
   "Jul",
-  "Aug",
-  "Sep",
+  "Ago",
+  "Set",
   "Oct",
   "Nov",
-  "Dec",
+  "Dic",
 ];
 const INTENSITY_CLASSES = [
   "bg-[#161b22]",
