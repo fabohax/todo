@@ -1,3 +1,43 @@
+/* Responsive tweaks for mobile and tablet */
+@media (max-width: 640px) {
+  .rounded-lg {
+    border-radius: 0.5rem !important;
+  }
+  .p-4 {
+    padding: 0.5rem !important;
+  }
+  .p-2 {
+    padding: 0.25rem !important;
+  }
+  .text-xl, .text-lg {
+    font-size: 1.1rem !important;
+  }
+  .text-base {
+    font-size: 1rem !important;
+  }
+  .gap-2 {
+    gap: 0.25rem !important;
+  }
+  .space-y-4 > :not([hidden]) ~ :not([hidden]) {
+    --tw-space-y-reverse: 0;
+    margin-top: 0.5rem !important;
+    margin-bottom: 0 !important;
+  }
+}
+@media (min-width: 641px) and (max-width: 768px) {
+  .text-xl {
+    font-size: 1.25rem !important;
+  }
+  .text-lg {
+    font-size: 1.1rem !important;
+  }
+  .p-4 {
+    padding: 0.75rem !important;
+  }
+  .gap-2 {
+    gap: 0.5rem !important;
+  }
+}
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -21,4 +61,22 @@ body {
   color: rgb(var(--foreground-rgb));
   background: #080808 ;
   overflow-x: hidden;
+}
+
+.contribution-scroll {
+  scrollbar-color: #30363d transparent;
+  scrollbar-width: thin;
+}
+
+.contribution-scroll::-webkit-scrollbar {
+  height: 8px;
+}
+
+.contribution-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.contribution-scroll::-webkit-scrollbar-thumb {
+  background: #30363d;
+  border-radius: 999px;
 }
