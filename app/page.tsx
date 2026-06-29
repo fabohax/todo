@@ -47,6 +47,14 @@ const getDateKey = (date: Date) => {
   return `${year}-${month}-${day}`;
 };
 
+const formatShortDate = (date: Date) => {
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = String(date.getFullYear()).slice(-2);
+
+  return `${day}/${month}/${year}`;
+};
+
 const getContributionLevel = (count: number) => {
   if (count === 0) return 0;
   if (count === 1) return 1;
@@ -84,20 +92,33 @@ export default function Home() {
     startDate.setDate(today.getDate() - 364);
     startDate.setDate(startDate.getDate() - startDate.getDay());
 
-    return Array.from({ length: 53 }, (_, weekIndex) =>
-      Array.from({ length: 7 }, (_, dayIndex): ContributionDay => {
-        const date = new Date(startDate);
-        date.setDate(startDate.getDate() + weekIndex * 7 + dayIndex);
+    const dayCount =
+      Math.floor(
+        (today.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000)
+      ) + 1;
 
-        const count = date > today ? 0 : completionsByDate[getDateKey(date)] ?? 0;
+    const contributionDays = Array.from(
+      { length: dayCount },
+      (_, dayIndex): ContributionDay => {
+        const date = new Date(startDate);
+        date.setDate(startDate.getDate() + dayIndex);
+
+        const count = completionsByDate[getDateKey(date)] ?? 0;
 
         return {
           date,
           count,
           level: getContributionLevel(count),
         };
-      })
+      }
     );
+
+    return contributionDays.reduce<ContributionDay[][]>((weeks, day, index) => {
+      const weekIndex = Math.floor(index / 7);
+      weeks[weekIndex] ??= [];
+      weeks[weekIndex].push(day);
+      return weeks;
+    }, []);
   }, [completedTasks]);
 
   const contributionMonths = useMemo(
@@ -277,8 +298,8 @@ export default function Home() {
                 week.map((day, dayIndex) => (
                   <div
                     key={`${weekIndex}-${dayIndex}`}
-                    title={`${day.count} task${day.count === 1 ? "" : "s"} completed on ${day.date.toLocaleDateString()}`}
-                    aria-label={`${day.count} task${day.count === 1 ? "" : "s"} completed on ${day.date.toLocaleDateString()}`}
+                    title={`${day.count} task${day.count === 1 ? "" : "s"} completed on ${formatShortDate(day.date)}`}
+                    aria-label={`${day.count} task${day.count === 1 ? "" : "s"} completed on ${formatShortDate(day.date)}`}
                     tabIndex={0}
                     className={`h-[13px] w-[13px] rounded-[3px] outline-none ring-offset-2 ring-offset-[#080808] focus-visible:ring-1 focus-visible:ring-[#8b949e] ${INTENSITY_CLASSES[day.level]}`}
                   />
