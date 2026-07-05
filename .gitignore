@@ -20,6 +20,9 @@
 # production
 /build
 
+# local app data
+tasks.json
+
 # misc
 .DS_Store
 *.pem
