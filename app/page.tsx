@@ -105,6 +105,22 @@ const normalizeTodoData = (data: TodoBackupData): TodoData => ({
       : [],
 });
 
+const saveTodoData = async (data: TodoData) => {
+  const response = await fetch("/api/todos", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to save todos: ${response.status}`);
+  }
+
+  return normalizeTodoData(await response.json());
+};
+
 export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
@@ -218,21 +234,11 @@ export default function Home() {
 
     const saveStoredData = async () => {
       try {
-        const response = await fetch("/api/todos", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            tasks,
-            completedTasks,
-            notes,
-          }),
+        await saveTodoData({
+          tasks,
+          completedTasks,
+          notes,
         });
-
-        if (!response.ok) {
-          throw new Error(`Failed to save todos: ${response.status}`);
-        }
       } catch (error) {
         console.error("Error saving data:", error);
       }
@@ -378,19 +384,19 @@ export default function Home() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const backupData = normalizeTodoData(JSON.parse(e.target?.result as string));
+        const savedData = await saveTodoData(backupData);
 
-        setTasks(backupData.tasks);
-        setCompletedTasks(backupData.completedTasks);
-        setNotes(backupData.notes);
-        
-        // Reset file input
-        event.target.value = "";
+        setTasks(savedData.tasks);
+        setCompletedTasks(savedData.completedTasks);
+        setNotes(savedData.notes);
       } catch (error) {
         console.error("Error parsing backup file:", error);
-        alert("Invalid backup file format");
+        alert("Could not import backup file");
+      } finally {
+        event.target.value = "";
       }
     };
     reader.readAsText(file);
