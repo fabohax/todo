@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { ArrowLeft, Check, Copy } from "lucide-react";
 
@@ -121,6 +121,35 @@ const saveTodoData = async (data: TodoData) => {
   return normalizeTodoData(await response.json());
 };
 
+const copyTextToClipboard = async (text: string) => {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch (error) {
+      console.warn("Clipboard API copy failed, trying fallback:", error);
+    }
+  }
+
+  const textArea = document.createElement("textarea");
+  textArea.value = text;
+  textArea.setAttribute("readonly", "");
+  textArea.style.position = "fixed";
+  textArea.style.left = "-9999px";
+  textArea.style.top = "0";
+
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+
+  const didCopy = document.execCommand("copy");
+  document.body.removeChild(textArea);
+
+  if (!didCopy) {
+    throw new Error("Fallback copy command failed");
+  }
+};
+
 export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
@@ -132,6 +161,31 @@ export default function Home() {
   const [copiedNoteIndex, setCopiedNoteIndex] = useState<number | null>(null);
   const [draggedTaskIndex, setDraggedTaskIndex] = useState<number | null>(null);
   const [hasLoadedStoredData, setHasLoadedStoredData] = useState(false);
+  const latestSaveDataRef = useRef<TodoData>({
+    tasks: [],
+    completedTasks: [],
+    notes: [],
+  });
+  const isSavingRef = useRef(false);
+  const hasPendingSaveRef = useRef(false);
+
+  const queueSaveTodoData = async (data: TodoData) => {
+    latestSaveDataRef.current = data;
+    hasPendingSaveRef.current = true;
+
+    if (isSavingRef.current) return;
+
+    isSavingRef.current = true;
+
+    try {
+      while (hasPendingSaveRef.current) {
+        hasPendingSaveRef.current = false;
+        await saveTodoData(latestSaveDataRef.current);
+      }
+    } finally {
+      isSavingRef.current = false;
+    }
+  };
 
   const contributionWeeks = useMemo(() => {
     const completionsByDate = completedTasks.reduce<Record<string, number>>(
@@ -234,7 +288,7 @@ export default function Home() {
 
     const saveStoredData = async () => {
       try {
-        await saveTodoData({
+        await queueSaveTodoData({
           tasks,
           completedTasks,
           notes,
@@ -275,7 +329,7 @@ export default function Home() {
       createdAt: new Date().toISOString(),
     };
 
-    setNotes([newNoteObject, ...notes]);
+    setNotes((currentNotes) => [newNoteObject, ...currentNotes]);
     setNewNote("");
   };
 
@@ -298,7 +352,7 @@ export default function Home() {
 
   const copyNote = async (note: Note, index: number) => {
     try {
-      await navigator.clipboard.writeText(note.text);
+      await copyTextToClipboard(note.text);
       setCopiedNoteIndex(index);
       window.setTimeout(() => setCopiedNoteIndex(null), 1200);
     } catch (error) {
@@ -387,11 +441,11 @@ export default function Home() {
     reader.onload = async (e) => {
       try {
         const backupData = normalizeTodoData(JSON.parse(e.target?.result as string));
-        const savedData = await saveTodoData(backupData);
 
-        setTasks(savedData.tasks);
-        setCompletedTasks(savedData.completedTasks);
-        setNotes(savedData.notes);
+        setTasks(backupData.tasks);
+        setCompletedTasks(backupData.completedTasks);
+        setNotes(backupData.notes);
+        await queueSaveTodoData(backupData);
       } catch (error) {
         console.error("Error parsing backup file:", error);
         alert("Could not import backup file");
