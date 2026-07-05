@@ -2,12 +2,32 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
+import { ArrowLeft, Check, Copy } from "lucide-react";
 
 type Task = {
   text: string;
   completed: boolean;
   createdAt: string;
   completedAt?: string;
+};
+
+type Note = {
+  text: string;
+  createdAt: string;
+};
+
+type TodoData = {
+  tasks: Task[];
+  completedTasks: Task[];
+  notes: Note[];
+};
+
+type TodoBackupData = Partial<TodoData> & {
+  pending?: Task[];
+  completed?: Task[];
+  "todo-tasks"?: Task[];
+  "todo-completed-tasks"?: Task[];
+  "todo-notes"?: Note[];
 };
 
 type ContributionDay = {
@@ -63,11 +83,39 @@ const getContributionLevel = (count: number) => {
   return 4;
 };
 
+const normalizeTodoData = (data: TodoBackupData): TodoData => ({
+  tasks: Array.isArray(data.tasks)
+    ? data.tasks
+    : Array.isArray(data.pending)
+      ? data.pending
+      : Array.isArray(data["todo-tasks"])
+        ? data["todo-tasks"]
+        : [],
+  completedTasks: Array.isArray(data.completedTasks)
+    ? data.completedTasks
+    : Array.isArray(data.completed)
+      ? data.completed
+      : Array.isArray(data["todo-completed-tasks"])
+        ? data["todo-completed-tasks"]
+        : [],
+  notes: Array.isArray(data.notes)
+    ? data.notes
+    : Array.isArray(data["todo-notes"])
+      ? data["todo-notes"]
+      : [],
+});
+
 export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
+  const [notes, setNotes] = useState<Note[]>([]);
   const [newTask, setNewTask] = useState<string>("");
+  const [newNote, setNewNote] = useState<string>("");
+  const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
+  const [isNotesSidebarClosing, setIsNotesSidebarClosing] = useState(false);
+  const [copiedNoteIndex, setCopiedNoteIndex] = useState<number | null>(null);
   const [draggedTaskIndex, setDraggedTaskIndex] = useState<number | null>(null);
+  const [hasLoadedStoredData, setHasLoadedStoredData] = useState(false);
 
   const contributionWeeks = useMemo(() => {
     const completionsByDate = completedTasks.reduce<Record<string, number>>(
@@ -142,17 +190,56 @@ export default function Home() {
   );
 
   useEffect(() => {
-    const savedTasks = localStorage.getItem("todo-tasks");
-    const savedCompletedTasks = localStorage.getItem("todo-completed-tasks");
+    const loadStoredData = async () => {
+      try {
+        const response = await fetch("/api/todos");
 
-    if (savedTasks) setTasks(JSON.parse(savedTasks));
-    if (savedCompletedTasks) setCompletedTasks(JSON.parse(savedCompletedTasks));
+        if (!response.ok) {
+          throw new Error(`Failed to load todos: ${response.status}`);
+        }
+
+        const savedData = normalizeTodoData(await response.json());
+
+        setTasks(savedData.tasks);
+        setCompletedTasks(savedData.completedTasks);
+        setNotes(savedData.notes);
+      } catch (error) {
+        console.error("Error loading saved data:", error);
+      } finally {
+        setHasLoadedStoredData(true);
+      }
+    };
+
+    loadStoredData();
   }, []);
 
   useEffect(() => {
-    localStorage.setItem("todo-tasks", JSON.stringify(tasks));
-    localStorage.setItem("todo-completed-tasks", JSON.stringify(completedTasks));
-  }, [tasks, completedTasks]);
+    if (!hasLoadedStoredData) return;
+
+    const saveStoredData = async () => {
+      try {
+        const response = await fetch("/api/todos", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            tasks,
+            completedTasks,
+            notes,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to save todos: ${response.status}`);
+        }
+      } catch (error) {
+        console.error("Error saving data:", error);
+      }
+    };
+
+    saveStoredData();
+  }, [tasks, completedTasks, notes, hasLoadedStoredData]);
 
   const formatDate = (timestamp: string) => {
     if (!timestamp) return "N/A";
@@ -170,6 +257,47 @@ export default function Home() {
       const updatedTasks = [newTaskObject, ...tasks];
       setTasks(updatedTasks);
       setNewTask("");
+    }
+  };
+
+  const addNote = () => {
+    const trimmedNote = newNote.trim();
+    if (!trimmedNote) return;
+
+    const newNoteObject: Note = {
+      text: trimmedNote,
+      createdAt: new Date().toISOString(),
+    };
+
+    setNotes([newNoteObject, ...notes]);
+    setNewNote("");
+  };
+
+  const openNotesSidebar = () => {
+    setIsNotesSidebarClosing(false);
+    setIsNotesModalOpen(true);
+  };
+
+  const closeNotesSidebar = () => {
+    setIsNotesSidebarClosing(true);
+    window.setTimeout(() => {
+      setIsNotesModalOpen(false);
+      setIsNotesSidebarClosing(false);
+    }, 180);
+  };
+
+  const deleteNote = (index: number) => {
+    setNotes(notes.filter((_, noteIndex) => noteIndex !== index));
+  };
+
+  const copyNote = async (note: Note, index: number) => {
+    try {
+      await navigator.clipboard.writeText(note.text);
+      setCopiedNoteIndex(index);
+      window.setTimeout(() => setCopiedNoteIndex(null), 1200);
+    } catch (error) {
+      console.error("Error copying note:", error);
+      alert("Could not copy note");
     }
   };
 
@@ -230,6 +358,7 @@ export default function Home() {
     const backupData = {
       "todo-tasks": tasks,
       "todo-completed-tasks": completedTasks,
+      "todo-notes": notes,
       backupDate: new Date().toISOString()
     };
     const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
@@ -251,15 +380,11 @@ export default function Home() {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const backupData = JSON.parse(e.target?.result as string);
-        
-        // Validate the backup data structure
-        if (backupData["todo-tasks"] && Array.isArray(backupData["todo-tasks"])) {
-          setTasks(backupData["todo-tasks"]);
-        }
-        if (backupData["todo-completed-tasks"] && Array.isArray(backupData["todo-completed-tasks"])) {
-          setCompletedTasks(backupData["todo-completed-tasks"]);
-        }
+        const backupData = normalizeTodoData(JSON.parse(e.target?.result as string));
+
+        setTasks(backupData.tasks);
+        setCompletedTasks(backupData.completedTasks);
+        setNotes(backupData.notes);
         
         // Reset file input
         event.target.value = "";
@@ -273,6 +398,114 @@ export default function Home() {
 
   return (
     <div className="p-3 sm:p-4 md:p-6 lg:w-1/2 lg:mx-auto my-2 sm:my-12 md:my-16 lg:my-20 text-[1.1rem] sm:text-[1.25rem] md:text-[1.5rem] h-screen max-w-full">
+      <button
+        type="button"
+        onClick={openNotesSidebar}
+        aria-label="Open notes"
+        className="fixed left-2 top-2 z-30 flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-[#080808] text-xl leading-none transition hover:bg-white hover:text-black sm:left-4 sm:top-4"
+      >
+        +
+      </button>
+
+      {isNotesModalOpen && (
+        <div className="fixed inset-0 z-40" role="presentation">
+          <button
+            type="button"
+            aria-label="Close notes"
+            className={`notes-backdrop absolute inset-0 bg-black/70 ${
+              isNotesSidebarClosing ? "notes-backdrop-closing" : ""
+            }`}
+            onClick={closeNotesSidebar}
+          />
+          <aside
+            className={`notes-sidebar absolute left-0 top-0 flex h-full w-[min(88vw,24rem)] flex-col border-r border-[#333] bg-[#0d0d0d] p-3 shadow-2xl sm:p-4 ${
+              isNotesSidebarClosing ? "notes-sidebar-closing" : ""
+            }`}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="notes-sidebar-title"
+          >
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 id="notes-sidebar-title" className="text-lg sm:text-xl">
+                Notes
+              </h2>
+              <button
+                type="button"
+                onClick={closeNotesSidebar}
+                aria-label="Close notes"
+                className="flex h-9 w-9 items-center justify-center rounded border border-[#333] text-base transition hover:bg-white hover:text-black"
+              >
+                <ArrowLeft aria-hidden="true" size={18} strokeWidth={2} />
+              </button>
+            </div>
+
+            <form
+              className="mb-3 flex items-center gap-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                addNote();
+              }}
+            >
+              <input
+                type="text"
+                value={newNote}
+                onChange={(event) => setNewNote(event.target.value)}
+                placeholder="Add a note"
+                className="min-w-0 flex-1 rounded-lg border border-gray-300 bg-transparent p-2 text-base outline-none focus:border-white sm:p-3"
+              />
+              <button
+                type="submit"
+                aria-label="Add note"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-gray-300 text-xl leading-none transition hover:bg-white hover:text-black sm:h-12 sm:w-12"
+              >
+                +
+              </button>
+            </form>
+
+            <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+              {notes.map((note, index) => (
+                <li
+                  key={`${note.createdAt}-${index}`}
+                  className="flex items-start justify-between gap-3 rounded-lg bg-[#111] p-3 text-base"
+                >
+                  <div className="min-w-0">
+                    <p className="break-words">{note.text}</p>
+                    <div className="mt-2 text-xs text-gray-600">
+                      ■ {formatDate(note.createdAt)}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => copyNote(note, index)}
+                      aria-label={
+                        copiedNoteIndex === index ? "Copied note" : "Copy note"
+                      }
+                      title={copiedNoteIndex === index ? "Copied" : "Copy"}
+                      className="flex h-8 w-8 items-center justify-center rounded border border-[#333] transition hover:bg-white hover:text-black"
+                    >
+                      {copiedNoteIndex === index ? (
+                        <Check aria-hidden="true" size={16} strokeWidth={2} />
+                      ) : (
+                        <Copy aria-hidden="true" size={16} strokeWidth={2} />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteNote(index)}
+                      aria-label="Delete note"
+                      className="flex h-8 w-8 items-center justify-center rounded border border-[#333] text-sm transition hover:bg-red-500 hover:text-white"
+                    >
+                      ×
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </aside>
+        </div>
+      )}
+
       <div className="mb-2 sm:mb-6 md:mb-8 contribution-scroll overflow-x-auto pb-2">
         <div className="w-fit text-xs text-gray-400">
           <div className="ml-9 grid grid-flow-col auto-cols-[13px] gap-[3px]">

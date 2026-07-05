@@ -80,3 +80,63 @@ body {
   background: #30363d;
   border-radius: 999px;
 }
+
+.notes-sidebar {
+  animation: notes-slide-in 180ms ease-out;
+}
+
+.notes-sidebar-closing {
+  animation: notes-slide-out 180ms ease-in forwards;
+}
+
+.notes-backdrop {
+  animation: notes-fade-in 180ms ease-out;
+}
+
+.notes-backdrop-closing {
+  animation: notes-fade-out 180ms ease-in forwards;
+}
+
+@keyframes notes-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes notes-slide-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes notes-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes notes-fade-out {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}

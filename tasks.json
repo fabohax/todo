@@ -1,4 +1,25 @@
 {
-  "pending": [],
-  "completed": []
+  "pending": [
+    {
+      "text": "prueba 2",
+      "completed": false,
+      "createdAt": "2026-07-04T23:57:48.044Z"
+    },
+    {
+      "text": "prueba 1",
+      "completed": false,
+      "createdAt": "2026-07-04T23:57:45.924Z"
+    }
+  ],
+  "completed": [],
+  "notes": [
+    {
+      "text": "nota 2",
+      "createdAt": "2026-07-04T23:57:53.322Z"
+    },
+    {
+      "text": "nota 1",
+      "createdAt": "2026-07-04T23:57:51.723Z"
+    }
+  ]
 }
