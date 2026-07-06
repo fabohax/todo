@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { ArrowLeft, Check, Copy } from "lucide-react";
 
@@ -37,20 +37,37 @@ type ContributionDay = {
 };
 
 const DAY_LABELS = ["", "Lun", "", "Mie", "", "Vie", ""];
-const MONTH_LABELS = [
-  "Ene",
-  "Feb",
-  "Mar",
-  "Abr",
-  "May",
-  "Jun",
-  "Jul",
-  "Ago",
-  "Set",
-  "Oct",
-  "Nov",
-  "Dic",
-];
+const MONTH_LABELS = {
+  en: [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ],
+  es: [
+    "Ene",
+    "Feb",
+    "Mar",
+    "Abr",
+    "May",
+    "Jun",
+    "Jul",
+    "Ago",
+    "Set",
+    "Oct",
+    "Nov",
+    "Dic",
+  ],
+};
+type DeviceLanguage = keyof typeof MONTH_LABELS;
 const INTENSITY_CLASSES = [
   "bg-[#161b22]",
   "bg-[#0e4429]",
@@ -81,6 +98,22 @@ const getContributionLevel = (count: number) => {
   if (count <= 3) return 2;
   if (count <= 5) return 3;
   return 4;
+};
+
+const getDeviceLanguage = (): DeviceLanguage => {
+  if (typeof navigator === "undefined") return "es";
+
+  const languages = navigator.languages?.length
+    ? navigator.languages
+    : [navigator.language];
+  const primaryLanguage = languages.find(Boolean)?.toLowerCase() ?? "";
+
+  return primaryLanguage.startsWith("en") ? "en" : "es";
+};
+
+const subscribeToLanguageChange = (onStoreChange: () => void) => {
+  window.addEventListener("languagechange", onStoreChange);
+  return () => window.removeEventListener("languagechange", onStoreChange);
 };
 
 const normalizeTodoData = (data: TodoBackupData): TodoData => ({
@@ -154,6 +187,11 @@ export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
+  const deviceLanguage = useSyncExternalStore<DeviceLanguage>(
+    subscribeToLanguageChange,
+    getDeviceLanguage,
+    () => "es"
+  );
   const [newTask, setNewTask] = useState<string>("");
   const [newNote, setNewNote] = useState<string>("");
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
@@ -254,9 +292,9 @@ export default function Home() {
           return "";
         }
 
-        return MONTH_LABELS[firstDayOfMonth.date.getMonth()];
+        return MONTH_LABELS[deviceLanguage][firstDayOfMonth.date.getMonth()];
       }),
-    [contributionWeeks]
+    [contributionWeeks, deviceLanguage]
   );
 
   useEffect(() => {
@@ -486,9 +524,6 @@ export default function Home() {
             aria-labelledby="notes-sidebar-title"
           >
             <div className="mb-3 flex items-center justify-between gap-3">
-              <h2 id="notes-sidebar-title" className="text-lg sm:text-xl">
-                Notes
-              </h2>
               <button
                 type="button"
                 onClick={closeNotesSidebar}
@@ -510,7 +545,7 @@ export default function Home() {
                 type="text"
                 value={newNote}
                 onChange={(event) => setNewNote(event.target.value)}
-                placeholder="Add a note"
+                placeholder="░"
                 className="min-w-0 flex-1 rounded-lg border border-gray-300 bg-transparent p-2 text-base outline-none focus:border-white sm:p-3"
               />
               <button
