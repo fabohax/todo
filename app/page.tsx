@@ -198,7 +198,6 @@ export default function Home() {
   const [isNotesSidebarClosing, setIsNotesSidebarClosing] = useState(false);
   const [copiedNoteIndex, setCopiedNoteIndex] = useState<number | null>(null);
   const [draggedTaskIndex, setDraggedTaskIndex] = useState<number | null>(null);
-  const [hasLoadedStoredData, setHasLoadedStoredData] = useState(false);
   const latestSaveDataRef = useRef<TodoData>({
     tasks: [],
     completedTasks: [],
@@ -206,6 +205,7 @@ export default function Home() {
   });
   const isSavingRef = useRef(false);
   const hasPendingSaveRef = useRef(false);
+  const hasLocalWriteRef = useRef(false);
 
   const queueSaveTodoData = async (data: TodoData) => {
     latestSaveDataRef.current = data;
@@ -223,6 +223,19 @@ export default function Home() {
     } finally {
       isSavingRef.current = false;
     }
+  };
+
+  const replaceTodoData = (data: TodoData) => {
+    latestSaveDataRef.current = data;
+    setTasks(data.tasks);
+    setCompletedTasks(data.completedTasks);
+    setNotes(data.notes);
+  };
+
+  const persistTodoData = async (data: TodoData) => {
+    hasLocalWriteRef.current = true;
+    replaceTodoData(data);
+    await queueSaveTodoData(data);
   };
 
   const contributionWeeks = useMemo(() => {
@@ -308,36 +321,16 @@ export default function Home() {
 
         const savedData = normalizeTodoData(await response.json());
 
-        setTasks(savedData.tasks);
-        setCompletedTasks(savedData.completedTasks);
-        setNotes(savedData.notes);
+        if (hasLocalWriteRef.current) return;
+
+        replaceTodoData(savedData);
       } catch (error) {
         console.error("Error loading saved data:", error);
-      } finally {
-        setHasLoadedStoredData(true);
       }
     };
 
     loadStoredData();
   }, []);
-
-  useEffect(() => {
-    if (!hasLoadedStoredData) return;
-
-    const saveStoredData = async () => {
-      try {
-        await queueSaveTodoData({
-          tasks,
-          completedTasks,
-          notes,
-        });
-      } catch (error) {
-        console.error("Error saving data:", error);
-      }
-    };
-
-    saveStoredData();
-  }, [tasks, completedTasks, notes, hasLoadedStoredData]);
 
   const formatDate = (timestamp: string) => {
     if (!timestamp) return "N/A";
@@ -345,20 +338,28 @@ export default function Home() {
     return date.toLocaleString();
   };
 
-  const addTask = () => {
+  const addTask = async () => {
     if (newTask.trim()) {
       const newTaskObject: Task = {
-        text: newTask,
+        text: newTask.trim(),
         completed: false,
         createdAt: new Date().toISOString(),
       };
       const updatedTasks = [newTaskObject, ...tasks];
-      setTasks(updatedTasks);
       setNewTask("");
+      try {
+        await persistTodoData({
+          tasks: updatedTasks,
+          completedTasks,
+          notes,
+        });
+      } catch (error) {
+        console.error("Error saving task:", error);
+      }
     }
   };
 
-  const addNote = () => {
+  const addNote = async () => {
     const trimmedNote = newNote.trim();
     if (!trimmedNote) return;
 
@@ -367,8 +368,17 @@ export default function Home() {
       createdAt: new Date().toISOString(),
     };
 
-    setNotes((currentNotes) => [newNoteObject, ...currentNotes]);
+    const updatedNotes = [newNoteObject, ...notes];
     setNewNote("");
+    try {
+      await persistTodoData({
+        tasks,
+        completedTasks,
+        notes: updatedNotes,
+      });
+    } catch (error) {
+      console.error("Error saving note:", error);
+    }
   };
 
   const openNotesSidebar = () => {
@@ -384,8 +394,17 @@ export default function Home() {
     }, 180);
   };
 
-  const deleteNote = (index: number) => {
-    setNotes(notes.filter((_, noteIndex) => noteIndex !== index));
+  const deleteNote = async (index: number) => {
+    const updatedNotes = notes.filter((_, noteIndex) => noteIndex !== index);
+    try {
+      await persistTodoData({
+        tasks,
+        completedTasks,
+        notes: updatedNotes,
+      });
+    } catch (error) {
+      console.error("Error deleting note:", error);
+    }
   };
 
   const copyNote = async (note: Note, index: number) => {
@@ -399,7 +418,7 @@ export default function Home() {
     }
   };
 
-  const toggleCompletion = (index: number, isCompleted: boolean) => {
+  const toggleCompletion = async (index: number, isCompleted: boolean) => {
     if (isCompleted) {
       const task = completedTasks[index];
       const updatedCompletedTasks = completedTasks.filter((_, i) => i !== index);
@@ -407,8 +426,15 @@ export default function Home() {
         ...tasks,
         { ...task, completed: false, completedAt: undefined },
       ];
-      setCompletedTasks(updatedCompletedTasks);
-      setTasks(updatedTasks);
+      try {
+        await persistTodoData({
+          tasks: updatedTasks,
+          completedTasks: updatedCompletedTasks,
+          notes,
+        });
+      } catch (error) {
+        console.error("Error updating task:", error);
+      }
     } else {
       const task = tasks[index];
       const updatedTasks = tasks.filter((_, i) => i !== index);
@@ -416,18 +442,41 @@ export default function Home() {
         ...completedTasks,
         { ...task, completed: true, completedAt: new Date().toISOString() },
       ];
-      setTasks(updatedTasks);
-      setCompletedTasks(updatedCompletedTasks);
+      try {
+        await persistTodoData({
+          tasks: updatedTasks,
+          completedTasks: updatedCompletedTasks,
+          notes,
+        });
+      } catch (error) {
+        console.error("Error updating task:", error);
+      }
     }
   };
 
-  const deleteTask = (index: number, isCompleted: boolean) => {
+  const deleteTask = async (index: number, isCompleted: boolean) => {
     if (isCompleted) {
       const updatedCompletedTasks = completedTasks.filter((_, i) => i !== index);
-      setCompletedTasks(updatedCompletedTasks);
+      try {
+        await persistTodoData({
+          tasks,
+          completedTasks: updatedCompletedTasks,
+          notes,
+        });
+      } catch (error) {
+        console.error("Error deleting task:", error);
+      }
     } else {
       const updatedTasks = tasks.filter((_, i) => i !== index);
-      setTasks(updatedTasks);
+      try {
+        await persistTodoData({
+          tasks: updatedTasks,
+          completedTasks,
+          notes,
+        });
+      } catch (error) {
+        console.error("Error deleting task:", error);
+      }
     }
   };
 
@@ -435,19 +484,35 @@ export default function Home() {
     setDraggedTaskIndex(index);
   };
 
-  const handleDrop = (targetIndex: number, isCompleted: boolean) => {
+  const handleDrop = async (targetIndex: number, isCompleted: boolean) => {
     if (draggedTaskIndex === null) return;
 
     if (isCompleted) {
       const reorderedTasks = [...completedTasks];
       const [movedTask] = reorderedTasks.splice(draggedTaskIndex, 1);
       reorderedTasks.splice(targetIndex, 0, movedTask);
-      setCompletedTasks(reorderedTasks);
+      try {
+        await persistTodoData({
+          tasks,
+          completedTasks: reorderedTasks,
+          notes,
+        });
+      } catch (error) {
+        console.error("Error reordering tasks:", error);
+      }
     } else {
       const reorderedTasks = [...tasks];
       const [movedTask] = reorderedTasks.splice(draggedTaskIndex, 1);
       reorderedTasks.splice(targetIndex, 0, movedTask);
-      setTasks(reorderedTasks);
+      try {
+        await persistTodoData({
+          tasks: reorderedTasks,
+          completedTasks,
+          notes,
+        });
+      } catch (error) {
+        console.error("Error reordering tasks:", error);
+      }
     }
     setDraggedTaskIndex(null);
   };
@@ -480,10 +545,7 @@ export default function Home() {
       try {
         const backupData = normalizeTodoData(JSON.parse(e.target?.result as string));
 
-        setTasks(backupData.tasks);
-        setCompletedTasks(backupData.completedTasks);
-        setNotes(backupData.notes);
-        await queueSaveTodoData(backupData);
+        await persistTodoData(backupData);
       } catch (error) {
         console.error("Error parsing backup file:", error);
         alert("Could not import backup file");

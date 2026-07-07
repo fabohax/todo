@@ -20,6 +20,9 @@ type StoredTodoData = {
   notes?: Note[];
   tasks?: Task[];
   completedTasks?: Task[];
+  "todo-tasks"?: Task[];
+  "todo-completed-tasks"?: Task[];
+  "todo-notes"?: Note[];
 };
 
 const dataFilePath = path.join(process.cwd(), "tasks.json");
@@ -29,13 +32,21 @@ const normalizeTodoData = (data: StoredTodoData) => ({
     ? data.tasks
     : Array.isArray(data.pending)
       ? data.pending
-      : [],
+      : Array.isArray(data["todo-tasks"])
+        ? data["todo-tasks"]
+        : [],
   completedTasks: Array.isArray(data.completedTasks)
     ? data.completedTasks
     : Array.isArray(data.completed)
       ? data.completed
+      : Array.isArray(data["todo-completed-tasks"])
+        ? data["todo-completed-tasks"]
+        : [],
+  notes: Array.isArray(data.notes)
+    ? data.notes
+    : Array.isArray(data["todo-notes"])
+      ? data["todo-notes"]
       : [],
-  notes: Array.isArray(data.notes) ? data.notes : [],
 });
 
 const readTodoData = async () => {
@@ -58,9 +69,10 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const data = normalizeTodoData((await request.json()) as StoredTodoData);
+  const temporaryFilePath = `${dataFilePath}.tmp`;
 
   await fs.writeFile(
-    dataFilePath,
+    temporaryFilePath,
     `${JSON.stringify(
       {
         pending: data.tasks,
@@ -72,6 +84,7 @@ export async function POST(request: Request) {
     )}\n`,
     "utf8"
   );
+  await fs.rename(temporaryFilePath, dataFilePath);
 
   return NextResponse.json(data);
 }
