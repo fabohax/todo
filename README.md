@@ -1,6 +1,6 @@
 # Minimal TODO App
 
-A simple and minimalistic TODO application built with **Next.js** and **TypeScript**. The app allows users to add tasks, mark them as completed, undo completed tasks, and delete tasks. Completed tasks are shown in a separate list. All tasks are persisted in a local `tasks.json` file.
+A simple and minimalistic TODO application built with **Next.js** and **TypeScript**. The app allows users to add tasks, mark them as completed, undo completed tasks, and delete tasks. Completed tasks are shown in a separate list. Tasks are persisted only in the current browser via `localStorage`.
 
 ## Features
 
@@ -8,7 +8,7 @@ A simple and minimalistic TODO application built with **Next.js** and **TypeScri
 - **Mark as Completed**: Move tasks to a "Completed" list.
 - **Undo Completed**: Move tasks back to the pending list.
 - **Delete Tasks**: Remove tasks from either list.
-- **Persistent Storage**: Tasks are saved locally in `tasks.json`.
+- **Browser-only Storage**: Tasks are saved in the current browser via `localStorage`.
 - **Exportable Static App**: Package the app as a standalone static site for local use.
 
 ## Technologies Used
@@ -16,7 +16,7 @@ A simple and minimalistic TODO application built with **Next.js** and **TypeScri
 - [Next.js](https://nextjs.org/) (React Framework)
 - TypeScript (for type safety)
 - Tailwind CSS (for styling)
-- Node.js (`fs` module for file handling)
+- Browser `localStorage`
 
 ## Installation
 
@@ -80,9 +80,10 @@ You can export this app as a fully static application that can run locally witho
 4. **Delete Tasks**:
    - Click the "Delete" button next to a task to remove it permanently.
 
-5. **Persistent Storage**:
-   - Tasks are saved in a `tasks.json` file.
-   - The app reads this file when it starts to reload tasks.
+5. **Browser-only Storage**:
+   - Tasks are saved in `localStorage` for the current browser/device.
+   - The deployed app does not expose a shared server-side todo database.
+   - The app reloads tasks from browser storage when it starts.
 
 6. **Static Export**:
    - The app can be exported as static files for offline or local use.

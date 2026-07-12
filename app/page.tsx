@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
+import { useState, useEffect, useMemo, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { ArrowLeft, Check, Copy } from "lucide-react";
 
@@ -20,6 +20,7 @@ type TodoData = {
   tasks: Task[];
   completedTasks: Task[];
   notes: Note[];
+  updatedAt?: string;
 };
 
 type TodoBackupData = Partial<TodoData> & {
@@ -75,6 +76,7 @@ const INTENSITY_CLASSES = [
   "bg-[#26a641]",
   "bg-[#39d353]",
 ];
+const TODO_STORAGE_KEY = "todo-data";
 
 const getDateKey = (date: Date) => {
   const year = date.getFullYear();
@@ -136,22 +138,25 @@ const normalizeTodoData = (data: TodoBackupData): TodoData => ({
     : Array.isArray(data["todo-notes"])
       ? data["todo-notes"]
       : [],
+  updatedAt: typeof data.updatedAt === "string" ? data.updatedAt : undefined,
 });
 
-const saveTodoData = async (data: TodoData) => {
-  const response = await fetch("/api/todos", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to save todos: ${response.status}`);
+const readLocalTodoData = () => {
+  try {
+    const storedData = window.localStorage.getItem(TODO_STORAGE_KEY);
+    return storedData ? normalizeTodoData(JSON.parse(storedData)) : null;
+  } catch (error) {
+    console.error("Error reading local todos:", error);
+    return null;
   }
+};
 
-  return normalizeTodoData(await response.json());
+const writeLocalTodoData = (data: TodoData) => {
+  try {
+    window.localStorage.setItem(TODO_STORAGE_KEY, JSON.stringify(data));
+  } catch (error) {
+    console.error("Error saving local todos:", error);
+  }
 };
 
 const copyTextToClipboard = async (text: string) => {
@@ -198,44 +203,20 @@ export default function Home() {
   const [isNotesSidebarClosing, setIsNotesSidebarClosing] = useState(false);
   const [copiedNoteIndex, setCopiedNoteIndex] = useState<number | null>(null);
   const [draggedTaskIndex, setDraggedTaskIndex] = useState<number | null>(null);
-  const latestSaveDataRef = useRef<TodoData>({
-    tasks: [],
-    completedTasks: [],
-    notes: [],
-  });
-  const isSavingRef = useRef(false);
-  const hasPendingSaveRef = useRef(false);
-  const hasLocalWriteRef = useRef(false);
-
-  const queueSaveTodoData = async (data: TodoData) => {
-    latestSaveDataRef.current = data;
-    hasPendingSaveRef.current = true;
-
-    if (isSavingRef.current) return;
-
-    isSavingRef.current = true;
-
-    try {
-      while (hasPendingSaveRef.current) {
-        hasPendingSaveRef.current = false;
-        await saveTodoData(latestSaveDataRef.current);
-      }
-    } finally {
-      isSavingRef.current = false;
-    }
-  };
-
   const replaceTodoData = (data: TodoData) => {
-    latestSaveDataRef.current = data;
     setTasks(data.tasks);
     setCompletedTasks(data.completedTasks);
     setNotes(data.notes);
   };
 
   const persistTodoData = async (data: TodoData) => {
-    hasLocalWriteRef.current = true;
-    replaceTodoData(data);
-    await queueSaveTodoData(data);
+    const dataWithTimestamp = {
+      ...data,
+      updatedAt: new Date().toISOString(),
+    };
+
+    replaceTodoData(dataWithTimestamp);
+    writeLocalTodoData(dataWithTimestamp);
   };
 
   const contributionWeeks = useMemo(() => {
@@ -311,21 +292,11 @@ export default function Home() {
   );
 
   useEffect(() => {
-    const loadStoredData = async () => {
-      try {
-        const response = await fetch("/api/todos");
+    const loadStoredData = () => {
+      const localData = readLocalTodoData();
 
-        if (!response.ok) {
-          throw new Error(`Failed to load todos: ${response.status}`);
-        }
-
-        const savedData = normalizeTodoData(await response.json());
-
-        if (hasLocalWriteRef.current) return;
-
-        replaceTodoData(savedData);
-      } catch (error) {
-        console.error("Error loading saved data:", error);
+      if (localData) {
+        replaceTodoData(localData);
       }
     };
 
