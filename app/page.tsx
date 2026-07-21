@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { ArrowLeft, Check, Copy } from "lucide-react";
+import { ArrowLeft, Check, Copy, GripVertical } from "lucide-react";
 
 type Task = {
   text: string;
@@ -77,6 +77,12 @@ const INTENSITY_CLASSES = [
   "bg-[#39d353]",
 ];
 const TODO_STORAGE_KEY = "todo-data";
+const MOBILE_BREAKPOINT = 640;
+const MOBILE_PAGE_X_PADDING = 24;
+const CONTRIBUTION_DAY_LABEL_WIDTH = 28;
+const CONTRIBUTION_LABEL_GRID_GAP = 8;
+const CONTRIBUTION_CELL_SIZE = 13;
+const CONTRIBUTION_CELL_GAP = 3;
 
 const getDateKey = (date: Date) => {
   const year = date.getFullYear();
@@ -116,6 +122,35 @@ const getDeviceLanguage = (): DeviceLanguage => {
 const subscribeToLanguageChange = (onStoreChange: () => void) => {
   window.addEventListener("languagechange", onStoreChange);
   return () => window.removeEventListener("languagechange", onStoreChange);
+};
+
+const getViewportWidth = () =>
+  typeof window === "undefined" ? 1024 : window.innerWidth;
+
+const subscribeToViewportResize = (onStoreChange: () => void) => {
+  window.addEventListener("resize", onStoreChange);
+  window.addEventListener("orientationchange", onStoreChange);
+
+  return () => {
+    window.removeEventListener("resize", onStoreChange);
+    window.removeEventListener("orientationchange", onStoreChange);
+  };
+};
+
+const getMobileContributionWeekCount = (viewportWidth: number) => {
+  if (viewportWidth >= MOBILE_BREAKPOINT) return Number.POSITIVE_INFINITY;
+
+  const availableWidth =
+    viewportWidth -
+    MOBILE_PAGE_X_PADDING -
+    CONTRIBUTION_DAY_LABEL_WIDTH -
+    CONTRIBUTION_LABEL_GRID_GAP;
+  const weekWidth = CONTRIBUTION_CELL_SIZE + CONTRIBUTION_CELL_GAP;
+
+  return Math.max(
+    12,
+    Math.floor((availableWidth + CONTRIBUTION_CELL_GAP) / weekWidth)
+  );
 };
 
 const normalizeTodoData = (data: TodoBackupData): TodoData => ({
@@ -197,11 +232,17 @@ export default function Home() {
     getDeviceLanguage,
     () => "es"
   );
+  const viewportWidth = useSyncExternalStore(
+    subscribeToViewportResize,
+    getViewportWidth,
+    () => 1024
+  );
   const [newTask, setNewTask] = useState<string>("");
   const [newNote, setNewNote] = useState<string>("");
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
   const [isNotesSidebarClosing, setIsNotesSidebarClosing] = useState(false);
   const [copiedNoteIndex, setCopiedNoteIndex] = useState<number | null>(null);
+  const [draggedNoteIndex, setDraggedNoteIndex] = useState<number | null>(null);
   const [draggedTaskIndex, setDraggedTaskIndex] = useState<number | null>(null);
   const replaceTodoData = (data: TodoData) => {
     setTasks(data.tasks);
@@ -271,24 +312,29 @@ export default function Home() {
     }, []);
   }, [completedTasks]);
 
+  const visibleContributionWeeks = useMemo(() => {
+    const weekCount = getMobileContributionWeekCount(viewportWidth);
+    return contributionWeeks.slice(-weekCount);
+  }, [contributionWeeks, viewportWidth]);
+
   const contributionMonths = useMemo(
     () =>
-      contributionWeeks.map((week, weekIndex) => {
-        const firstDayOfMonth = week.find((day) => day.date.getDate() === 1);
-        if (!firstDayOfMonth) return "";
+      visibleContributionWeeks.map((week, weekIndex) => {
+        const firstDay = week[0];
+        if (!firstDay) return "";
 
         if (
           weekIndex > 0 &&
-          contributionWeeks[weekIndex - 1].some(
-            (day) => day.date.getMonth() === firstDayOfMonth.date.getMonth()
+          visibleContributionWeeks[weekIndex - 1].some(
+            (day) => day.date.getMonth() === firstDay.date.getMonth()
           )
         ) {
           return "";
         }
 
-        return MONTH_LABELS[deviceLanguage][firstDayOfMonth.date.getMonth()];
+        return MONTH_LABELS[deviceLanguage][firstDay.date.getMonth()];
       }),
-    [contributionWeeks, deviceLanguage]
+    [visibleContributionWeeks, deviceLanguage]
   );
 
   useEffect(() => {
@@ -389,6 +435,30 @@ export default function Home() {
     }
   };
 
+  const handleNoteDrop = async (targetIndex: number) => {
+    if (draggedNoteIndex === null || draggedNoteIndex === targetIndex) {
+      setDraggedNoteIndex(null);
+      return;
+    }
+
+    const reorderedNotes = [...notes];
+    const [movedNote] = reorderedNotes.splice(draggedNoteIndex, 1);
+    reorderedNotes.splice(targetIndex, 0, movedNote);
+
+    setDraggedNoteIndex(null);
+    setCopiedNoteIndex(null);
+
+    try {
+      await persistTodoData({
+        tasks,
+        completedTasks,
+        notes: reorderedNotes,
+      });
+    } catch (error) {
+      console.error("Error reordering notes:", error);
+    }
+  };
+
   const toggleCompletion = async (index: number, isCompleted: boolean) => {
     if (isCompleted) {
       const task = completedTasks[index];
@@ -448,6 +518,27 @@ export default function Home() {
       } catch (error) {
         console.error("Error deleting task:", error);
       }
+    }
+  };
+
+  const moveTaskUp = async (index: number, isCompleted: boolean) => {
+    if (index === 0) return;
+
+    const sourceTasks = isCompleted ? completedTasks : tasks;
+    const reorderedTasks = [...sourceTasks];
+    [reorderedTasks[index - 1], reorderedTasks[index]] = [
+      reorderedTasks[index],
+      reorderedTasks[index - 1],
+    ];
+
+    try {
+      await persistTodoData({
+        tasks: isCompleted ? tasks : reorderedTasks,
+        completedTasks: isCompleted ? reorderedTasks : completedTasks,
+        notes,
+      });
+    } catch (error) {
+      console.error("Error moving task:", error);
     }
   };
 
@@ -590,13 +681,34 @@ export default function Home() {
               </button>
             </form>
 
-            <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+            <ul className="notes-scrollbar min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
               {notes.map((note, index) => (
                 <li
                   key={`${note.createdAt}-${index}`}
-                  className="flex items-start justify-between gap-3 rounded-lg bg-[#111] p-3 text-base"
+                  draggable
+                  onDragStart={(event) => {
+                    setDraggedNoteIndex(index);
+                    event.dataTransfer.effectAllowed = "move";
+                  }}
+                  onDragEnd={() => setDraggedNoteIndex(null)}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = "move";
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    handleNoteDrop(index);
+                  }}
+                  className={`flex cursor-grab items-start justify-between gap-3 rounded-lg bg-[#111] p-3 text-base transition-opacity active:cursor-grabbing ${
+                    draggedNoteIndex === index ? "opacity-40" : "opacity-100"
+                  }`}
                 >
-                  <div className="min-w-0">
+                  <GripVertical
+                    aria-hidden="true"
+                    className="mt-0.5 shrink-0 text-gray-600"
+                    size={18}
+                  />
+                  <div className="min-w-0 flex-1">
                     <p className="break-words">{note.text}</p>
                     <div className="mt-2 text-xs text-gray-600">
                       ■ {formatDate(note.createdAt)}
@@ -634,7 +746,7 @@ export default function Home() {
         </div>
       )}
 
-      <div className="mb-2 sm:mb-6 md:mb-8 contribution-scroll overflow-x-auto pb-2">
+      <div className="contribution-scroll mb-5 mt-12 overflow-x-auto pb-3 sm:mb-6 sm:mt-0 md:mb-8">
         <div className="w-fit text-xs text-gray-400">
           <div className="ml-9 grid grid-flow-col auto-cols-[13px] gap-[3px]">
             {contributionMonths.map((month, index) => (
@@ -655,7 +767,7 @@ export default function Home() {
               className="grid grid-flow-col auto-cols-[13px] grid-rows-7 gap-[3px]"
               aria-label="Tasks completed by day"
             >
-              {contributionWeeks.flatMap((week, weekIndex) =>
+              {visibleContributionWeeks.flatMap((week, weekIndex) =>
                 week.map((day, dayIndex) => (
                   <div
                     key={`${weekIndex}-${dayIndex}`}
@@ -672,18 +784,19 @@ export default function Home() {
       </div>
 
       {/* Add Task Section */}
-      <div className="flex items-center gap-1 sm:gap-2 mb-4 sm:mb-6 md:mb-8">
+      <div className="mb-5 flex items-center gap-2 sm:mb-6 md:mb-8">
         <input
           type="text"
           value={newTask}
           onChange={(e) => setNewTask(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && addTask()}
           placeholder="░"
-          className="p-2 sm:p-3 md:p-4 border border-gray-300 rounded-lg w-full bg-transparent text-base sm:text-lg md:text-xl"
+          className="h-12 w-full rounded-lg border border-gray-300 bg-transparent px-3 text-base sm:h-14 sm:px-4 sm:text-lg md:h-16 md:text-xl"
         />
         <button
           onClick={addTask}
-          className="px-4 sm:px-7 md:px-11 p-2 sm:p-3 md:p-4 border border-gray-300 rounded-lg bg-transparent hover:bg-[#fff] hover:text-black transition text-base sm:text-lg md:text-xl"
+          aria-label="Add task"
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-gray-300 bg-transparent text-xl leading-none transition hover:bg-[#fff] hover:text-black sm:h-14 sm:w-14 sm:text-2xl md:h-16 md:w-16"
         >
           +
         </button>
@@ -709,6 +822,14 @@ export default function Home() {
               </div>
             </div>
             <div className="flex gap-1 sm:gap-2">
+              <button
+                onClick={() => moveTaskUp(index, false)}
+                aria-label="Move task up"
+                disabled={index === 0}
+                className="px-2 p-1 border border-gray-300 rounded transition select-none text-base disabled:cursor-not-allowed disabled:opacity-30 hover:bg-white hover:text-black sm:hidden"
+              >
+                ↑
+              </button>
               <button
                 onClick={() => toggleCompletion(index, false)}
                 className="px-2 sm:px-3 md:px-4 p-1 sm:p-2 border border-gray-300 rounded hover:bg-green-500 hover:text-white transition select-none text-base sm:text-lg"
@@ -751,6 +872,14 @@ export default function Home() {
               )}
             </div>
             <div className="flex gap-1 sm:gap-2">
+              <button
+                onClick={() => moveTaskUp(index, true)}
+                aria-label="Move completed task up"
+                disabled={index === 0}
+                className="px-2 p-1 border border-[#222] rounded transition select-none text-base disabled:cursor-not-allowed disabled:opacity-30 hover:bg-white hover:text-black sm:hidden"
+              >
+                ↑
+              </button>
               <button
                 onClick={() => toggleCompletion(index, true)}
                 className="px-2 sm:px-3 md:px-4 p-1 sm:p-2 border border-[#222] rounded hover:bg-yellow-500 hover:text-white transition select-none text-base sm:text-lg"

@@ -85,6 +85,30 @@ body {
   animation: notes-slide-in 180ms ease-out;
 }
 
+.notes-scrollbar {
+  scrollbar-color: #3a3a3a #111;
+  scrollbar-width: thin;
+}
+
+.notes-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.notes-scrollbar::-webkit-scrollbar-track {
+  background: #111;
+  border-radius: 999px;
+}
+
+.notes-scrollbar::-webkit-scrollbar-thumb {
+  background: #3a3a3a;
+  border: 2px solid #111;
+  border-radius: 999px;
+}
+
+.notes-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
 .notes-sidebar-closing {
   animation: notes-slide-out 180ms ease-in forwards;
 }
