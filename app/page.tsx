@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { ArrowLeft, Check, Copy, GripVertical } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, ChevronRight, Copy, Folder, FolderPlus, GripVertical } from "lucide-react";
 
 type Task = {
   text: string;
@@ -14,12 +14,20 @@ type Task = {
 type Note = {
   text: string;
   createdAt: string;
+  folderId?: string;
+};
+
+type NoteFolder = {
+  id: string;
+  name: string;
+  createdAt: string;
 };
 
 type TodoData = {
   tasks: Task[];
   completedTasks: Task[];
   notes: Note[];
+  noteFolders: NoteFolder[];
   updatedAt?: string;
 };
 
@@ -29,6 +37,7 @@ type TodoBackupData = Partial<TodoData> & {
   "todo-tasks"?: Task[];
   "todo-completed-tasks"?: Task[];
   "todo-notes"?: Note[];
+  "todo-note-folders"?: NoteFolder[];
 };
 
 type ContributionDay = {
@@ -173,6 +182,11 @@ const normalizeTodoData = (data: TodoBackupData): TodoData => ({
     : Array.isArray(data["todo-notes"])
       ? data["todo-notes"]
       : [],
+  noteFolders: Array.isArray(data.noteFolders)
+    ? data.noteFolders
+    : Array.isArray(data["todo-note-folders"])
+      ? data["todo-note-folders"]
+      : [],
   updatedAt: typeof data.updatedAt === "string" ? data.updatedAt : undefined,
 });
 
@@ -227,6 +241,7 @@ export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
+  const [noteFolders, setNoteFolders] = useState<NoteFolder[]>([]);
   const deviceLanguage = useSyncExternalStore<DeviceLanguage>(
     subscribeToLanguageChange,
     getDeviceLanguage,
@@ -239,6 +254,11 @@ export default function Home() {
   );
   const [newTask, setNewTask] = useState<string>("");
   const [newNote, setNewNote] = useState<string>("");
+  const [newFolderName, setNewFolderName] = useState("");
+  const [isAddingFolder, setIsAddingFolder] = useState(false);
+  const [collapsedFolderIds, setCollapsedFolderIds] = useState<Set<string>>(
+    () => new Set()
+  );
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
   const [isNotesSidebarClosing, setIsNotesSidebarClosing] = useState(false);
   const [copiedNoteIndex, setCopiedNoteIndex] = useState<number | null>(null);
@@ -248,11 +268,13 @@ export default function Home() {
     setTasks(data.tasks);
     setCompletedTasks(data.completedTasks);
     setNotes(data.notes);
+    setNoteFolders(data.noteFolders);
   };
 
-  const persistTodoData = async (data: TodoData) => {
+  const persistTodoData = async (data: Omit<TodoData, "noteFolders"> & { noteFolders?: NoteFolder[] }) => {
     const dataWithTimestamp = {
       ...data,
+      noteFolders: data.noteFolders ?? noteFolders,
       updatedAt: new Date().toISOString(),
     };
 
@@ -398,6 +420,49 @@ export default function Home() {
     }
   };
 
+  const addNoteFolder = async () => {
+    const name = newFolderName.trim();
+    if (!name) return;
+
+    const folder: NoteFolder = {
+      id: typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      name,
+      createdAt: new Date().toISOString(),
+    };
+
+    setNewFolderName("");
+    setIsAddingFolder(false);
+    await persistTodoData({ tasks, completedTasks, notes, noteFolders: [...noteFolders, folder] });
+  };
+
+  const deleteNoteFolder = async (folderId: string) => {
+    const updatedNotes = notes.map((note) =>
+      note.folderId === folderId ? { ...note, folderId: undefined } : note
+    );
+    await persistTodoData({
+      tasks,
+      completedTasks,
+      notes: updatedNotes,
+      noteFolders: noteFolders.filter((folder) => folder.id !== folderId),
+    });
+    setCollapsedFolderIds((current) => {
+      const updated = new Set(current);
+      updated.delete(folderId);
+      return updated;
+    });
+  };
+
+  const toggleNoteFolder = (folderId: string) => {
+    setCollapsedFolderIds((current) => {
+      const updated = new Set(current);
+      if (updated.has(folderId)) updated.delete(folderId);
+      else updated.add(folderId);
+      return updated;
+    });
+  };
+
   const openNotesSidebar = () => {
     setIsNotesSidebarClosing(false);
     setIsNotesModalOpen(true);
@@ -443,7 +508,11 @@ export default function Home() {
 
     const reorderedNotes = [...notes];
     const [movedNote] = reorderedNotes.splice(draggedNoteIndex, 1);
-    reorderedNotes.splice(targetIndex, 0, movedNote);
+    const adjustedTargetIndex = draggedNoteIndex < targetIndex ? targetIndex - 1 : targetIndex;
+    reorderedNotes.splice(adjustedTargetIndex, 0, {
+      ...movedNote,
+      folderId: notes[targetIndex].folderId,
+    });
 
     setDraggedNoteIndex(null);
     setCopiedNoteIndex(null);
@@ -457,6 +526,15 @@ export default function Home() {
     } catch (error) {
       console.error("Error reordering notes:", error);
     }
+  };
+
+  const moveNoteToFolder = async (folderId?: string) => {
+    if (draggedNoteIndex === null) return;
+    const updatedNotes = notes.map((note, index) =>
+      index === draggedNoteIndex ? { ...note, folderId } : note
+    );
+    setDraggedNoteIndex(null);
+    await persistTodoData({ tasks, completedTasks, notes: updatedNotes });
   };
 
   const toggleCompletion = async (index: number, isCompleted: boolean) => {
@@ -584,6 +662,7 @@ export default function Home() {
       "todo-tasks": tasks,
       "todo-completed-tasks": completedTasks,
       "todo-notes": notes,
+      "todo-note-folders": noteFolders,
       backupDate: new Date().toISOString()
     };
     const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
@@ -617,6 +696,37 @@ export default function Home() {
     };
     reader.readAsText(file);
   };
+
+  const renderNote = (note: Note, index: number) => (
+    <li
+      key={`${note.createdAt}-${index}`}
+      draggable
+      onDragStart={(event) => {
+        setDraggedNoteIndex(index);
+        event.dataTransfer.effectAllowed = "move";
+      }}
+      onDragEnd={() => setDraggedNoteIndex(null)}
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        handleNoteDrop(index);
+      }}
+      className={`flex cursor-grab items-start justify-between gap-3 rounded-lg bg-[#111] p-3 text-base transition-opacity active:cursor-grabbing ${draggedNoteIndex === index ? "opacity-40" : "opacity-100"}`}
+    >
+      <GripVertical aria-hidden="true" className="mt-0.5 shrink-0 text-gray-600" size={18} />
+      <div className="min-w-0 flex-1">
+        <p className="break-words">{note.text}</p>
+        <div className="mt-2 text-xs text-gray-600">■ {formatDate(note.createdAt)}</div>
+      </div>
+      <div className="flex shrink-0 gap-2">
+        <button type="button" onClick={() => copyNote(note, index)} aria-label="Copiar nota" title={copiedNoteIndex === index ? "Copiada" : "Copiar"} className="flex h-8 w-8 items-center justify-center rounded border border-[#333] transition hover:bg-white hover:text-black">
+          {copiedNoteIndex === index ? <Check aria-hidden="true" size={16} /> : <Copy aria-hidden="true" size={16} />}
+        </button>
+        <button type="button" onClick={() => deleteNote(index)} aria-label="Eliminar nota" className="flex h-8 w-8 items-center justify-center rounded border border-[#333] text-sm transition hover:bg-red-500 hover:text-white">×</button>
+      </div>
+    </li>
+  );
 
   return (
     <div className="p-3 sm:p-4 md:p-6 lg:w-1/2 lg:mx-auto my-2 sm:my-12 md:my-16 lg:my-20 text-[1.1rem] sm:text-[1.25rem] md:text-[1.5rem] h-screen max-w-full">
@@ -656,7 +766,17 @@ export default function Home() {
               >
                 <ArrowLeft aria-hidden="true" size={18} strokeWidth={2} />
               </button>
+              <button type="button" onClick={() => setIsAddingFolder((value) => !value)} aria-label="Crear carpeta" title="Crear carpeta" className="flex h-9 w-9 items-center justify-center rounded border border-[#333] transition hover:bg-white hover:text-black">
+                <FolderPlus aria-hidden="true" size={18} />
+              </button>
             </div>
+
+            {isAddingFolder && (
+              <form className="mb-3 flex gap-2" onSubmit={(event) => { event.preventDefault(); addNoteFolder(); }}>
+                <input autoFocus value={newFolderName} onChange={(event) => setNewFolderName(event.target.value)} placeholder="Nombre de la carpeta" className="min-w-0 flex-1 rounded-lg border border-[#444] bg-transparent px-3 py-2 text-sm outline-none focus:border-white" />
+                <button type="submit" className="rounded-lg border border-[#444] px-3 text-sm transition hover:bg-white hover:text-black">Crear</button>
+              </form>
+            )}
 
             <form
               className="mb-3 flex items-center gap-2"
@@ -681,67 +801,35 @@ export default function Home() {
               </button>
             </form>
 
-            <ul className="notes-scrollbar min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-              {notes.map((note, index) => (
-                <li
-                  key={`${note.createdAt}-${index}`}
-                  draggable
-                  onDragStart={(event) => {
-                    setDraggedNoteIndex(index);
-                    event.dataTransfer.effectAllowed = "move";
-                  }}
-                  onDragEnd={() => setDraggedNoteIndex(null)}
-                  onDragOver={(event) => {
-                    event.preventDefault();
-                    event.dataTransfer.dropEffect = "move";
-                  }}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    handleNoteDrop(index);
-                  }}
-                  className={`flex cursor-grab items-start justify-between gap-3 rounded-lg bg-[#111] p-3 text-base transition-opacity active:cursor-grabbing ${
-                    draggedNoteIndex === index ? "opacity-40" : "opacity-100"
-                  }`}
-                >
-                  <GripVertical
-                    aria-hidden="true"
-                    className="mt-0.5 shrink-0 text-gray-600"
-                    size={18}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="break-words">{note.text}</p>
-                    <div className="mt-2 text-xs text-gray-600">
-                      ■ {formatDate(note.createdAt)}
+            <div className="notes-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+              {noteFolders.map((folder) => {
+                const folderNotes = notes.map((note, index) => ({ note, index })).filter(({ note }) => note.folderId === folder.id);
+                const isCollapsed = collapsedFolderIds.has(folder.id);
+                return (
+                  <section key={folder.id} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); moveNoteToFolder(folder.id); }} className="rounded-lg border border-[#2b2b2b] bg-[#0a0a0a] p-2">
+                    <div className="mb-2 flex items-center gap-2 px-1 text-sm text-gray-300">
+                      <button type="button" onClick={() => toggleNoteFolder(folder.id)} aria-expanded={!isCollapsed} aria-label={`${isCollapsed ? "Expandir" : "Contraer"} carpeta ${folder.name}`} className="flex min-w-0 flex-1 items-center gap-2 rounded py-1 text-left transition hover:text-white">
+                        {isCollapsed ? <ChevronRight aria-hidden="true" size={16} /> : <ChevronDown aria-hidden="true" size={16} />}
+                        <Folder aria-hidden="true" size={16} />
+                        <span className="min-w-0 flex-1 truncate">{folder.name}</span>
+                      </button>
+                      <span className="text-xs text-gray-600">{folderNotes.length}</span>
+                      <button type="button" onClick={() => deleteNoteFolder(folder.id)} aria-label={`Eliminar carpeta ${folder.name}`} title="Eliminar carpeta (conserva las notas)" className="flex h-7 w-7 items-center justify-center rounded text-gray-600 transition hover:bg-red-500 hover:text-white">×</button>
                     </div>
-                  </div>
-                  <div className="flex shrink-0 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => copyNote(note, index)}
-                      aria-label={
-                        copiedNoteIndex === index ? "Copied note" : "Copy note"
-                      }
-                      title={copiedNoteIndex === index ? "Copied" : "Copy"}
-                      className="flex h-8 w-8 items-center justify-center rounded border border-[#333] transition hover:bg-white hover:text-black"
-                    >
-                      {copiedNoteIndex === index ? (
-                        <Check aria-hidden="true" size={16} strokeWidth={2} />
-                      ) : (
-                        <Copy aria-hidden="true" size={16} strokeWidth={2} />
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => deleteNote(index)}
-                      aria-label="Delete note"
-                      className="flex h-8 w-8 items-center justify-center rounded border border-[#333] text-sm transition hover:bg-red-500 hover:text-white"
-                    >
-                      ×
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
+                    {!isCollapsed && (
+                      <ul className="space-y-2">
+                        {folderNotes.map(({ note, index }) => renderNote(note, index))}
+                        {folderNotes.length === 0 && <li className="rounded border border-dashed border-[#333] px-3 py-4 text-center text-xs text-gray-600">Arrastra notas aquí</li>}
+                      </ul>
+                    )}
+                  </section>
+                );
+              })}
+              <section onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); moveNoteToFolder(undefined); }}>
+                {noteFolders.length > 0 && <div className="mb-2 px-1 text-xs uppercase tracking-wide text-gray-600">Sin carpeta</div>}
+                <ul className="space-y-2">{notes.map((note, index) => !note.folderId && renderNote(note, index))}</ul>
+              </section>
+            </div>
           </aside>
         </div>
       )}
