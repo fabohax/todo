@@ -729,7 +729,7 @@ export default function Home() {
   );
 
   return (
-    <div className="p-3 sm:p-4 md:p-6 lg:w-1/2 lg:mx-auto my-2 sm:my-12 md:my-16 lg:my-20 text-[1.1rem] sm:text-[1.25rem] md:text-[1.5rem] h-screen max-w-full">
+    <div className="p-3 pt-14 sm:p-4 md:p-6 lg:w-1/2 lg:mx-auto my-2 sm:my-12 md:my-16 lg:my-20 text-[1.1rem] sm:text-[1.25rem] md:text-[1.5rem] h-screen max-w-full">
       <button
         type="button"
         onClick={openNotesSidebar}
@@ -834,7 +834,7 @@ export default function Home() {
         </div>
       )}
 
-      <div className="contribution-scroll mb-5 mt-12 overflow-x-auto pb-3 sm:mb-6 sm:mt-0 md:mb-8">
+      <div className="contribution-scroll hidden overflow-x-auto pb-3 sm:mb-6 sm:block md:mb-8">
         <div className="w-fit text-xs text-gray-400">
           <div className="ml-9 grid grid-flow-col auto-cols-[13px] gap-[3px]">
             {contributionMonths.map((month, index) => (
