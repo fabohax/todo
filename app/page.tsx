@@ -339,6 +339,37 @@ export default function Home() {
     return contributionWeeks.slice(-weekCount);
   }, [contributionWeeks, viewportWidth]);
 
+  const efficiencyIndex = useMemo(() => {
+    const totalTasks = tasks.length + completedTasks.length;
+    const percentage = totalTasks === 0
+      ? 0
+      : Math.round((completedTasks.length / totalTasks) * 100);
+    const durations = completedTasks.flatMap((task) => {
+      if (!task.createdAt || !task.completedAt) return [];
+      const startedAt = new Date(task.createdAt).getTime();
+      const finishedAt = new Date(task.completedAt).getTime();
+      return Number.isFinite(startedAt) && Number.isFinite(finishedAt) && finishedAt >= startedAt
+        ? [finishedAt - startedAt]
+        : [];
+    });
+    const averageDuration = durations.length
+      ? durations.reduce((total, duration) => total + duration, 0) / durations.length
+      : null;
+
+    return { percentage, averageDuration, completedCount: completedTasks.length, totalTasks };
+  }, [tasks, completedTasks]);
+
+  const formatDuration = (duration: number) => {
+    const minutes = Math.round(duration / 60000);
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    if (hours < 24) return remainingMinutes ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+    const days = Math.floor(hours / 24);
+    const remainingHours = hours % 24;
+    return remainingHours ? `${days}d ${remainingHours}h` : `${days}d`;
+  };
+
   const contributionMonths = useMemo(
     () =>
       visibleContributionWeeks.map((week, weekIndex) => {
@@ -738,6 +769,14 @@ export default function Home() {
       >
         +
       </button>
+
+      <div
+        className="fixed right-3 top-3 z-30 rounded-lg border border-[#333] bg-[#080808]/90 px-3 py-1.5 text-sm font-medium tabular-nums text-gray-200 sm:right-4 sm:top-4"
+        title={`Completed tasks: ${efficiencyIndex.completedCount}/${efficiencyIndex.totalTasks}. Average time from start to done: ${efficiencyIndex.averageDuration === null ? "not available yet" : formatDuration(efficiencyIndex.averageDuration)}.`}
+        aria-label={`Efficiency index ${efficiencyIndex.percentage} percent`}
+      >
+        {efficiencyIndex.percentage}%
+      </div>
 
       {isNotesModalOpen && (
         <div className="fixed inset-0 z-40" role="presentation">
